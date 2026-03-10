@@ -13,16 +13,46 @@
     <meta name="apple-mobile-web-app-title" content="Q-Nota">
     <meta name="application-name" content="Q-Nota">
     
-    <!-- Custom Super Thick Q Logo -->
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='25' fill='%234f46e5'/%3E%3Ctext x='50%25' y='54%25' font-family='Arial, sans-serif' font-size='72' font-weight='900' fill='white' stroke='white' stroke-width='4' text-anchor='middle' dominant-baseline='middle'%3EQ%3C/text%3E%3C/svg%3E">
-    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='25' fill='%234f46e5'/%3E%3Ctext x='50%25' y='54%25' font-family='Arial, sans-serif' font-size='72' font-weight='900' fill='white' stroke='white' stroke-width='4' text-anchor='middle' dominant-baseline='middle'%3EQ%3C/text%3E%3C/svg%3E">
+    <!-- Script Generate Logo PNG Kualitas Tinggi Otomatis -->
+    <script>
+        (function() {
+            var canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 512;
+            var ctx = canvas.getContext('2d');
+            
+            ctx.fillStyle = '#4f46e5';
+            ctx.fillRect(0, 0, 512, 512);
+            
+            ctx.fillStyle = 'white';
+            ctx.font = '900 380px Arial, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 20;
+            
+            ctx.strokeText('Q', 256, 285);
+            ctx.fillText('Q', 256, 285);
+            
+            var dataURL = canvas.toDataURL('image/png');
+            
+            var appleIcon = document.createElement('link');
+            appleIcon.rel = 'apple-touch-icon';
+            appleIcon.href = dataURL;
+            document.head.appendChild(appleIcon);
+            
+            var stdIcon = document.createElement('link');
+            stdIcon.rel = 'icon';
+            stdIcon.type = 'image/png';
+            stdIcon.href = dataURL;
+            document.head.appendChild(stdIcon);
+        })();
+    </script>
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    
-    <!-- Markdown Parser untuk Laporan Tabel AI -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
     <script src="https://www.gstatic.com/firebasejs/11.0.2/firebase-app-compat.js"></script>
@@ -35,15 +65,12 @@
             font-family: 'Inter', sans-serif; 
             -webkit-tap-highlight-color: transparent; 
             background-color: #f8fafc; 
-            
-            /* Trik khusus iOS: Terasa seperti aplikasi asli */
             -webkit-touch-callout: none;
             -webkit-user-select: none;
             user-select: none;
             overscroll-behavior-y: none;
         }
         
-        /* Mengizinkan ketik di kolom input */
         input, select, textarea {
             -webkit-user-select: auto;
             user-select: auto;
@@ -65,7 +92,6 @@
         .glass-nav { background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
         .glass-bubble { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); }
 
-        /* Styling Markdown Fin AI */
         .markdown-body table { width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 10px; font-size: 11px; }
         .markdown-body th { background-color: #e2e8f0; color: #1e293b; font-weight: 800; text-transform: uppercase; padding: 8px; border: 1px solid #cbd5e1; }
         .markdown-body td { padding: 8px; border: 1px solid #e2e8f0; color: #334155; }
@@ -116,7 +142,6 @@
             return str.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
         };
 
-        // --- ENVIRONMENT DETECTION ---
         let isLocalMode = false;
         let auth, db;
         let appId = 'q-nota-local';
@@ -136,7 +161,6 @@
             const [status, setStatus] = useState({ show: false, message: '', type: 'success' });
             const [showNav, setShowNav] = useState(true);
             
-            // --- DATA STATES ---
             const [cart, setCart] = useState(() => JSON.parse(localStorage.getItem('fin-cart') || '[]'));
             const [history, setHistory] = useState(() => JSON.parse(localStorage.getItem('fin-history') || '[]'));
             const [incomes, setIncomes] = useState(() => JSON.parse(localStorage.getItem('fin-incomes') || '[]'));
@@ -146,17 +170,21 @@
             
             const [user, setUser] = useState(null);
 
-            // --- CHAT & FIN FLOATING STATE ---
             const [isChatOpen, setIsChatOpen] = useState(false);
             const [hasNewFinAlert, setHasNewFinAlert] = useState(false);
             const [chats, setChats] = useState([]);
             const [chatInput, setChatInput] = useState('');
             const [isTyping, setIsTyping] = useState(false);
             const [isListening, setIsListening] = useState(false);
-            const [showPrompts, setShowPrompts] = useState(false); // State untuk menampilkan Saran Perintah
+            const [showPrompts, setShowPrompts] = useState(false); 
             const chatEndRef = useRef(null);
 
-            // --- PLAN STATES ---
+            // STATE UNTUK DRAG BUBBLE FIN
+            const [finPos, setFinPos] = useState({ right: 20, bottom: 96 }); // Default position in px
+            const isDraggingFin = useRef(false);
+            const finStartPos = useRef({ x: 0, y: 0, right: 0, bottom: 0 });
+            const [hasDragged, setHasDragged] = useState(false);
+
             const [editingId, setEditingId] = useState(null);
             const [itemName, setItemName] = useState('');
             const [qty, setQty] = useState('');
@@ -166,13 +194,11 @@
             const [showSuggestions, setShowSuggestions] = useState(false);
             const [currentNoteId, setCurrentNoteId] = useState(null);
 
-            // --- INCOME STATES ---
             const [incomeDate, setIncomeDate] = useState(getLocalDateStr());
             const [incomeSource, setIncomeSource] = useState('');
             const [incomeAmount, setIncomeAmount] = useState('');
             const [showIncomeSuggestions, setShowIncomeSuggestions] = useState(false);
 
-            // --- AGENDA STATES ---
             const [agendaDate, setAgendaDate] = useState(getLocalDateStr());
             const [agendaTitle, setAgendaTitle] = useState('');
             const [agendaAmount, setAgendaAmount] = useState('');
@@ -180,11 +206,8 @@
             const [reminderModal, setReminderModal] = useState({ show: false, items: [] });
             const hasCheckedAgenda = useRef(false);
 
-            // --- DASHBOARD EXPAND STATE ---
             const [expandedDay, setExpandedDay] = useState(null);
-
-            // --- FILTERS ---
-            const [filterMonth, setFilterMonth] = useState(getLocalDateStr().substring(0, 7)); // YYYY-MM
+            const [filterMonth, setFilterMonth] = useState(getLocalDateStr().substring(0, 7));
             const [dashboardMonth, setDashboardMonth] = useState(getLocalDateStr().substring(0, 7));
 
             const [confirmModal, setConfirmModal] = useState({ show: false, title: '', message: '', onConfirm: null });
@@ -211,7 +234,6 @@
                 return { history: `artifacts/${appId}/users/${user.uid}/history`, master: `artifacts/${appId}/users/${user.uid}/master/data`, cart: `artifacts/${appId}/users/${user.uid}/current/cart` };
             }, [user]);
 
-            // === FUNGSI RESET DATA BULANAN & CHAT ===
             const handleResetAllData = () => {
                 setConfirmModal({
                     show: true,
@@ -221,22 +243,15 @@
                         setConfirmModal({ ...confirmModal, show: false });
                         showStatus('Membersihkan data...', 'loading');
                         
-                        // Hapus State & LocalStorage
-                        setHistory([]);
-                        setIncomes([]);
-                        setAgendas([]);
-                        setCart([]);
+                        setHistory([]); setIncomes([]); setAgendas([]); setCart([]);
                         
-                        // Hapus Firebase Cloud Data (jika sinkronisasi aktif)
                         if (!isLocalMode && user && paths) {
                             try {
                                 const snapshot = await db.collection(paths.history).get();
                                 const batch = db.batch();
                                 snapshot.docs.forEach(doc => batch.delete(doc.ref));
                                 await batch.commit();
-                            } catch (e) {
-                                console.error("Gagal membersihkan cloud", e);
-                            }
+                            } catch (e) { console.error("Gagal membersihkan cloud", e); }
                         }
                         
                         setShowSettings(false);
@@ -264,7 +279,6 @@
                 });
             };
 
-            // Menghitung Saldo Kas Riil berdasarkan seluruh riwayat (termasuk agenda auto-solved)
             const getBalanceUpTo = (targetDateStr) => {
                 let bal = settings.saldoAwal;
                 bal += incomes.filter(i => i.date <= targetDateStr).reduce((s,i) => s + i.amount, 0);
@@ -277,7 +291,6 @@
 
             const currentBalance = useMemo(() => getBalanceUpTo(getLocalDateStr()), [incomes, history, agendas, settings]);
 
-            // Sync to LocalStorage
             useEffect(() => { localStorage.setItem('fin-cart', JSON.stringify(cart)); }, [cart]);
             useEffect(() => { localStorage.setItem('fin-history', JSON.stringify(history)); }, [history]);
             useEffect(() => { localStorage.setItem('fin-incomes', JSON.stringify(incomes)); }, [incomes]);
@@ -287,7 +300,6 @@
 
             useEffect(() => { if (isChatOpen) chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chats, isTyping, isChatOpen]);
 
-            // Load Cloud Data
             useEffect(() => {
                 const login = async () => {
                     if (isLocalMode) { setUser({ uid: 'local_user', displayName: 'Guest' }); return; }
@@ -309,7 +321,6 @@
                 return () => unsubHistory();
             }, [user, paths]);
 
-            // --- ALARM TAGIHAN LOGIC ---
             useEffect(() => {
                 if (hasCheckedAgenda.current) return;
                 const checkAgendas = () => {
@@ -335,7 +346,6 @@
                 return () => clearTimeout(timer);
             }, [agendas]);
 
-            // --- AI & CHAT LOGIC ---
             useEffect(() => {
                 if (chats.length === 0) {
                     const todayStr = getLocalDateStr();
@@ -367,7 +377,6 @@
                 }
             }, []);
 
-            // Logika Penyimpanan Otomatis oleh AI
             const processAddIncome = (data) => {
                 const newIncome = { id: 'inc-' + Date.now() + Math.random(), date: data.date, source: toTitleCase(data.source), amount: data.amount, timestamp: Date.now() };
                 setIncomes(prev => [newIncome, ...prev].sort((a,b) => b.timestamp - a.timestamp));
@@ -400,13 +409,21 @@
             };
 
             const fetchFinAI = async (userText) => {
-                const apiKey = "AIzaSyBKVgmmvg3JzaSE5oT56lsf94DsimB3CV4"; // API key kosong, ditangani oleh environment
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+                // =======================================================================
+                // PENTING: ISI API KEY ANDA DI BAWAH INI SEBELUM MENGGUNAKAN DI GITHUB
+                // =======================================================================
+                const apiKey = "AIzaSyAEZlLEM_SZDqo_0dX7RQx2SVfEJmgHGao"; // <--- Ganti string kosong ini dengan API Key dari Google AI Studio
+                
+                if (!apiKey || apiKey === "") {
+                    return { reply: "Bos, API Key Gemini belum diisi nih. Tolong masukkan API Key di kode sumber webnya (variabel `apiKey`) supaya Fin bisa mikir dan bantu analisis lagi! 😅", actions: [] };
+                }
+
+                // Endpoint Flash Latest Sesuai Permintaan
+                const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=" + apiKey;
                 
                 const todayStr = getLocalDateStr();
                 const currentMonthStr = todayStr.substring(0, 7);
                 
-                // Menyiapkan Data Realtime untuk dikonsumsi AI (Agar bisa menjawab laporan)
                 const todayIncTotal = incomes.filter(i => i.date === todayStr).reduce((s,i) => s + i.amount, 0);
                 const todayExpTotal = history.filter(h => h.date === todayStr).reduce((s,h) => s + h.total, 0);
                 
@@ -505,16 +522,14 @@ ATURAN WAJIB: Jangan gunakan markdown code block (\`\`\`json) di respons Anda, l
                         const data = await res.json();
                         const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
                         
-                        // Bersihkan backticks markdown dan bersihkan enter liar di dalam JSON string
                         let cleanJson = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
-                        // Mengatasi isu newline/enter yang sering merusak JSON dari AI
                         cleanJson = cleanJson.replace(/\n(?! *["}\]])/g, "\\n"); 
                         
                         return JSON.parse(cleanJson);
                     } catch (err) {
                         if (i === 4) {
                             console.error("FetchFinAI Final Error:", err);
-                            return { reply: "Waduh Bos, Fin gagal mikir nih atau formatnya salah. Coba ketik lagi ya.", actions: [] };
+                            return { reply: "Waduh Bos, Fin gagal mikir nih atau formatnya salah. Bisa jadi API Key-nya tidak valid. Coba cek log atau ketik ulang ya.", actions: [] };
                         }
                         await new Promise(r => setTimeout(r, delay));
                         delay *= 2;
@@ -539,7 +554,6 @@ ATURAN WAJIB: Jangan gunakan markdown code block (\`\`\`json) di respons Anda, l
                     setChats(prev => [...prev, { id: Date.now()+1, sender: 'fin', text: responseObj.reply, type: 'text' }]);
                     if (!isChatOpen) setHasNewFinAlert(true);
 
-                    // Eksekusi Aksi Otomatis jika ada
                     if (responseObj.actions && responseObj.actions.length > 0) {
                         for (let act of responseObj.actions) {
                             if (act.type === 'add_income') processAddIncome(act.data);
@@ -555,10 +569,9 @@ ATURAN WAJIB: Jangan gunakan markdown code block (\`\`\`json) di respons Anda, l
                 if (!isChatOpen) setHasNewFinAlert(true);
             };
 
-            // --- SPEECH RECOGNITION ---
             const startListening = () => {
                 if (!('webkitSpeechRecognition' in window)) {
-                    alert("Maaf Bos, browser di perangkat ini belum mendukung fitur suara (Gunakan Chrome/Safari versi terbaru).");
+                    alert("Maaf Bos, browser di perangkat ini belum mendukung fitur suara.");
                     return;
                 }
                 const recognition = new window.webkitSpeechRecognition();
@@ -576,7 +589,6 @@ ATURAN WAJIB: Jangan gunakan markdown code block (\`\`\`json) di respons Anda, l
                 recognition.start();
             };
 
-            // --- PLAN LOGIC ---
             const handleDateChange = (e, setter) => {
                 const val = e.target.value;
                 if (!val) setter(getLocalDateStr()); else setter(val);
@@ -664,20 +676,15 @@ ATURAN WAJIB: Jangan gunakan markdown code block (\`\`\`json) di respons Anda, l
                 el.select(); document.execCommand('copy'); document.body.removeChild(el); showStatus('Prompt Disalin!');
             };
 
-            // PROMPT KHUSUS UNTUK FINA AI EKSTERNAL
             const generatePrompt = (cartData, date) => {
                 const todayFormatted = new Date(date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
                 const itemCount = cartData.length;
-                
-                // Format terstruktur baru sesuai permintaan (menghitung otomatis jumlah barang)
                 let text = `Fina, tolong proses ${itemCount} transaksi pengeluaran bahan baku di bawah ini untuk tanggal ${todayFormatted}. Input satu per satu secara terpisah:\n`;
                 const itemsList = cartData.map((item, index) => `${index + 1}. Catat pengeluaran ${item.name} ${item.qty} ${item.unit} (${Math.round(item.total)})`).join('\n');
                 text += itemsList;
-                
                 copyToClipboard(text);
             };
 
-            // --- INCOME LOGIC ---
             const handleSaveIncome = (e) => {
                 e.preventDefault();
                 if (!incomeSource || !incomeAmount) { showStatus('Data Belum Lengkap', 'error'); return; }
@@ -711,7 +718,6 @@ ATURAN WAJIB: Jangan gunakan markdown code block (\`\`\`json) di respons Anda, l
                 copyToClipboard(`Fina, tolong catat Pemasukan dari ${source} pada tanggal ${dateFormatted} sebesar Rp ${amount}`);
             };
 
-            // --- AGENDA & OPERATIONAL LOGIC ---
             const handleAddAgenda = (e) => {
                 e.preventDefault();
                 if(!agendaTitle || !agendaAmount) return;
@@ -740,7 +746,6 @@ ATURAN WAJIB: Jangan gunakan markdown code block (\`\`\`json) di respons Anda, l
 
             const renderAgendaSummary = () => {
                 const dStr = agendaDate;
-                
                 let dayInc = incomes.filter(i => i.date === dStr).reduce((s,i) => s + i.amount, 0);
                 let dayExp = history.filter(h => h.date === dStr).reduce((s,h) => s + h.total, 0);
                 let agIn = agendas.filter(a => a.date === dStr && a.type === 'masuk').reduce((s,a) => s + a.amount, 0);
@@ -824,12 +829,9 @@ ATURAN WAJIB: Jangan gunakan markdown code block (\`\`\`json) di respons Anda, l
                 );
             };
 
-            // --- DASHBOARD / CASH FLOW DATA ---
             const getDashboardData = () => {
                 const todayStr = getLocalDateStr();
                 
-                // Logika Warung: Jika hari ini belum ada pemasukan ber-tanggal hari ini, 
-                // maka tarik data omzet dari H-1 (Kemarin) sebagai uang masuk pagi ini.
                 const yesterdayObj = new Date();
                 yesterdayObj.setDate(yesterdayObj.getDate() - 1);
                 const yesterdayStr = getLocalDateStr(yesterdayObj);
@@ -895,10 +897,8 @@ ATURAN WAJIB: Jangan gunakan markdown code block (\`\`\`json) di respons Anda, l
                 const totalExp = pastDays.reduce((sum, d) => sum + d.dailyOut, 0);
                 const avgExp = totalExp / daysPassed;
                 
-                // Estimasi Saldo Akhir disinkronkan agar sama persis dengan baris terakhir tabel Cash Flow
                 const estAkhir = data.reportDays.length > 0 ? data.reportDays[data.reportDays.length - 1].saldoAkhir : 0;
 
-                // --- TARGET & PERFORM DATA BULANAN ---
                 const [yearStr, monthStr] = dashboardMonth.split('-');
                 const daysInMonth = new Date(parseInt(yearStr), parseInt(monthStr), 0).getDate();
                 
@@ -946,7 +946,6 @@ ATURAN WAJIB: Jangan gunakan markdown code block (\`\`\`json) di respons Anda, l
                                 <div className="w-4 h-4 text-indigo-500"><Icons.Chart /></div> Performa Bulan Ini
                             </h3>
 
-                            {/* Omzet Bar */}
                             <div className="mb-4">
                                 <div className="flex justify-between items-end mb-1.5">
                                     <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Target Omzet ({Math.round(omzetPct)}%)</span>
@@ -957,7 +956,6 @@ ATURAN WAJIB: Jangan gunakan markdown code block (\`\`\`json) di respons Anda, l
                                 </div>
                             </div>
 
-                            {/* Tagihan Bar */}
                             <div className="mb-4">
                                 <div className="flex justify-between items-end mb-1.5">
                                     <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Tagihan Lunas ({Math.round(tagihanPct)}%)</span>
@@ -968,7 +966,6 @@ ATURAN WAJIB: Jangan gunakan markdown code block (\`\`\`json) di respons Anda, l
                                 </div>
                             </div>
 
-                            {/* Kas Akhir Bar */}
                             <div className="mb-5">
                                 <div className="flex justify-between items-end mb-1.5">
                                     <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Target Sisa Kas ({Math.round(kasPct)}%)</span>
@@ -979,7 +976,6 @@ ATURAN WAJIB: Jangan gunakan markdown code block (\`\`\`json) di respons Anda, l
                                 </div>
                             </div>
 
-                            {/* Status Break Even */}
                             <div className={`p-4 rounded-2xl flex items-center justify-between border ${profitBulanIni >= 0 ? 'bg-green-50 border-green-100' : 'bg-red-50 border-red-100'}`}>
                                 <div>
                                     <p className={`text-[9px] font-black uppercase tracking-widest ${profitBulanIni >= 0 ? 'text-green-600' : 'text-red-500'}`}>Status Break Even</p>
@@ -1085,6 +1081,50 @@ ATURAN WAJIB: Jangan gunakan markdown code block (\`\`\`json) di respons Anda, l
                 );
             };
 
+            // FUNGSI DRAG BUBBLE FIN MENGGUNAKAN POINTER EVENTS
+            const handleFinPointerDown = (e) => {
+                isDraggingFin.current = true;
+                setHasDragged(false);
+                finStartPos.current = { 
+                    x: e.clientX || (e.touches && e.touches[0].clientX) || 0, 
+                    y: e.clientY || (e.touches && e.touches[0].clientY) || 0, 
+                    right: finPos.right, 
+                    bottom: finPos.bottom 
+                };
+                if (e.target.setPointerCapture && e.pointerId) e.target.setPointerCapture(e.pointerId);
+            };
+
+            const handleFinPointerMove = (e) => {
+                if (!isDraggingFin.current) return;
+                
+                const clientX = e.clientX || (e.touches && e.touches[0].clientX) || 0;
+                const clientY = e.clientY || (e.touches && e.touches[0].clientY) || 0;
+                
+                const dx = finStartPos.current.x - clientX;
+                const dy = finStartPos.current.y - clientY;
+                
+                if (Math.abs(dx) > 5 || Math.abs(dy) > 5) setHasDragged(true);
+
+                setFinPos({
+                    right: Math.max(0, Math.min(window.innerWidth - 60, finStartPos.current.right + dx)),
+                    bottom: Math.max(0, Math.min(window.innerHeight - 60, finStartPos.current.bottom + dy))
+                });
+            };
+
+            const handleFinPointerUp = (e) => {
+                isDraggingFin.current = false;
+                if (e.target.releasePointerCapture && e.pointerId) e.target.releasePointerCapture(e.pointerId);
+            };
+
+            const handleFinClick = () => {
+                if (hasDragged) {
+                    setHasDragged(false); // Batalkan klik karena pengguna hanya menggeser
+                    return;
+                }
+                setIsChatOpen(true); 
+                setHasNewFinAlert(false);
+            };
+
             const renderFloatingFin = () => (
                 <div className={`fixed inset-0 z-[600] pointer-events-none flex flex-col justify-end transition-all duration-300 ${isChatOpen ? 'bg-black/40 pointer-events-auto backdrop-blur-sm' : ''}`}>
                     <div className={`w-full max-w-md mx-auto bg-slate-50 rounded-t-[2.5rem] shadow-2xl pointer-events-auto flex flex-col transition-transform duration-500 ease-in-out border-t border-slate-200 ${isChatOpen ? 'translate-y-0 h-[85vh]' : 'translate-y-full h-[85vh] opacity-0'}`}>
@@ -1120,16 +1160,13 @@ ATURAN WAJIB: Jangan gunakan markdown code block (\`\`\`json) di respons Anda, l
                             <div ref={chatEndRef} />
                         </div>
                         
-                        {/* Area Komponen Saran Perintah (Toggle) */}
                         <div className="p-4 bg-white border-t border-slate-100 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.05)] z-10 relative">
-                            {/* Tombol Buka Tutup */}
                             <div className="flex justify-between items-center mb-2">
                                 <button type="button" onClick={() => setShowPrompts(!showPrompts)} className="text-[10px] font-bold text-slate-500 flex items-center gap-1 bg-slate-100 px-3 py-1.5 rounded-full hover:bg-slate-200 transition-colors">
                                     💡 Saran Perintah {showPrompts ? 'Tutup 🔼' : 'Buka 🔽'}
                                 </button>
                             </div>
 
-                            {/* Kotak Grid Perintah */}
                             <div className={`transition-all duration-300 overflow-hidden ${showPrompts ? 'max-h-40 opacity-100 mb-3' : 'max-h-0 opacity-0 mb-0'}`}>
                                 <div className="grid grid-cols-2 gap-2">
                                     <button onClick={() => { handleChatSubmit(null, "Fin, tolong analisa kas dan keuangan bulan ini. Apakah kita profit atau boncos?"); setShowPrompts(false); }} className="bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase p-2.5 rounded-xl border border-indigo-100 flex items-center justify-center gap-1 hover:bg-indigo-100 text-center">📈 Analisa Kas</button>
@@ -1197,7 +1234,6 @@ ATURAN WAJIB: Jangan gunakan markdown code block (\`\`\`json) di respons Anda, l
                                     <button onClick={() => setShowSettings(false)} className="w-full py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-lg active:scale-[0.98] transition-all">SIMPAN PENGATURAN</button>
                                 </div>
                                 
-                                {/* ZONA BERBAHAYA UNTUK RESET BULANAN */}
                                 <div className="mt-8 pt-6 border-t border-red-100">
                                     <h4 className="text-[10px] font-black uppercase tracking-widest text-red-500 mb-3 text-center">Zona Berbahaya</h4>
                                     <button onClick={handleResetAllData} className="w-full py-4 bg-red-50 text-red-600 font-black rounded-2xl border border-red-100 flex items-center justify-center gap-2 active:bg-red-100 transition-colors">
@@ -1434,11 +1470,21 @@ ATURAN WAJIB: Jangan gunakan markdown code block (\`\`\`json) di respons Anda, l
                         )}
                     </main>
 
-                    {/* Floating Fin AI Button */}
-                    <div className={`fixed right-5 z-[550] transition-all duration-500 ${showNav && !isChatOpen ? 'bottom-24' : (isChatOpen ? 'bottom-2 opacity-0 pointer-events-none' : 'bottom-6')}`}>
-                        <button onClick={() => { setIsChatOpen(true); setHasNewFinAlert(false); }} className="relative bg-indigo-600 text-white p-4 rounded-full shadow-2xl border border-indigo-400 hover:scale-105 active:scale-95 transition-all">
-                            <div className="w-6 h-6"><Icons.MessageCircle /></div>
-                            {hasNewFinAlert && <span className="absolute 1 top-0 right-0 w-3.5 h-3.5 bg-red-500 border-2 border-indigo-600 rounded-full animate-pulse"></span>}
+                    {/* Draggable Fin AI Button Wrapper */}
+                    <div 
+                        className={`fixed z-[550] transition-opacity duration-300 ${isChatOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+                        style={{ right: `${finPos.right}px`, bottom: `${finPos.bottom}px`, touchAction: 'none' }}
+                        onPointerDown={handleFinPointerDown}
+                        onPointerMove={handleFinPointerMove}
+                        onPointerUp={handleFinPointerUp}
+                        onPointerCancel={handleFinPointerUp}
+                    >
+                        <button 
+                            onClick={handleFinClick} 
+                            className="relative bg-indigo-600 text-white p-4 rounded-full shadow-[0_10px_25px_rgba(79,70,229,0.5)] border border-indigo-400 active:scale-95 transition-transform"
+                        >
+                            <div className="w-6 h-6 pointer-events-none"><Icons.MessageCircle /></div>
+                            {hasNewFinAlert && <span className="absolute top-0 right-0 w-3.5 h-3.5 bg-red-500 border-2 border-white rounded-full animate-pulse pointer-events-none"></span>}
                         </button>
                     </div>
 
@@ -1473,7 +1519,6 @@ ATURAN WAJIB: Jangan gunakan markdown code block (\`\`\`json) di respons Anda, l
                         </button>
                     </nav>
 
-                    {/* Memanggil Komponen Fin agar muncul saat diklik */}
                     {renderFloatingFin()}
                 </div>
             );
