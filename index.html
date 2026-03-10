@@ -443,8 +443,8 @@
                     return { reply: "Bos, API Key Gemini belum diisi nih. Tolong masukkan API Key di kode sumber webnya (variabel `apiKey`) supaya Fin bisa mikir dan bantu analisis lagi! 😅", actions: [] };
                 }
 
-                // Endpoint Flash Latest Sesuai Permintaan
-                const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=" + apiKey;
+                // Menggunakan model 1.5 Flash agar stabil membaca struktur gambar
+                const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey;
                 
                 const todayStr = getLocalDateStr();
                 const currentMonthStr = todayStr.substring(0, 7);
@@ -503,14 +503,31 @@ FORMAT OBJECT "actions" (Bisa diisi BANYAK object untuk input massal sekaligus):
 
 ATURAN WAJIB: Jangan gunakan markdown code block (\`\`\`json) di respons Anda, langsung output object JSON.`;
 
-                let contents = chatHistory.slice(-5).map(chat => ({
-                    role: chat.sender === 'fin' ? 'model' : 'user',
-                    parts: [{ text: chat.text || "Gambar terlampir sebelumnya" }]
-                }));
+                // --- PERBAIKAN STRUKTUR HISTORY AGAR TIDAK DITOLAK API ---
+                let contents = [];
+                let safeHistory = chatHistory.slice(-6); // Ambil 6 chat terakhir
+                
+                // Gemini API mewajibkan role pertama dalam 'contents' adalah 'user'. 
+                // Kita buang chat 'model' (sapaan awal Fin) jika ada di urutan paling awal.
+                while (safeHistory.length > 0 && safeHistory[0].sender === 'fin') {
+                    safeHistory.shift();
+                }
+
+                safeHistory.forEach(chat => {
+                    const role = chat.sender === 'fin' ? 'model' : 'user';
+                    const text = chat.text || "Gambar terlampir sebelumnya";
+                    
+                    // Gabungkan teks jika ada dua role berturut-turut agar struktur API valid (user->model->user)
+                    if (contents.length > 0 && contents[contents.length - 1].role === role) {
+                        contents[contents.length - 1].parts[0].text += "\n\n" + text;
+                    } else {
+                        contents.push({ role: role, parts: [{ text: text }] });
+                    }
+                });
 
                 const currentParts = [];
                 if (userText) currentParts.push({ text: userText });
-                else if (imageData) currentParts.push({ text: "Tolong analisa gambar nota/catatan ini." });
+                else if (imageData) currentParts.push({ text: "Tolong analisa gambar nota/catatan/tangkapan layar ini dengan teliti." });
 
                 if (imageData) {
                     currentParts.push({
@@ -521,7 +538,12 @@ ATURAN WAJIB: Jangan gunakan markdown code block (\`\`\`json) di respons Anda, l
                     });
                 }
 
-                contents.push({ role: "user", parts: currentParts });
+                // Gabungkan prompt yang baru diketik ke pesan user yang terakhir (jika ada)
+                if (contents.length > 0 && contents[contents.length - 1].role === 'user') {
+                    contents[contents.length - 1].parts.push(...currentParts);
+                } else {
+                    contents.push({ role: "user", parts: currentParts });
+                }
 
                 const payload = {
                     contents: contents,
@@ -611,7 +633,8 @@ ATURAN WAJIB: Jangan gunakan markdown code block (\`\`\`json) di respons Anda, l
                 setAttachedImage(null);
                 setIsTyping(true);
                 
-                const historyToPass = [...chats];
+                // --- PERBAIKAN: Gunakan status obrolan TERBARU (termasuk yang baru saja diketik) ---
+                const historyToPass = [...chats, newUserChat];
                 const responseObj = await fetchFinAI(text, imageToProcess, historyToPass);
                 
                 setIsTyping(false);
