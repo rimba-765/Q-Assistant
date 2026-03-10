@@ -125,7 +125,8 @@
             Copy: () => <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>,
             Mic: () => <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>,
             Refresh: () => <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>,
-            Chart: () => <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+            Chart: () => <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>,
+            Camera: () => <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
         };
 
         const initialItems = ["Ayam Gede (Mentah)", "Lele Segar", "Telur Ayam", "Beras", "Minyak Goreng", "Gula Pasir", "Gas LPG 3Kg", "Sabun Cuci", "Lunch Box Size M", "Cup Minum", "Kangkung", "Tahu Putih (Mentah)"];
@@ -167,6 +168,7 @@
             const [agendas, setAgendas] = useState(() => JSON.parse(localStorage.getItem('fin-agendas') || '[]'));
             const [itemsDB, setItemsDB] = useState(() => JSON.parse(localStorage.getItem('fin-master') || JSON.stringify(initialItems)));
             const [settings, setSettings] = useState(() => JSON.parse(localStorage.getItem('fin-settings') || JSON.stringify(defaultSettings)));
+            const [holidays, setHolidays] = useState(() => JSON.parse(localStorage.getItem('fin-holidays') || '[]'));
             
             const [user, setUser] = useState(null);
 
@@ -177,6 +179,8 @@
             const [isTyping, setIsTyping] = useState(false);
             const [isListening, setIsListening] = useState(false);
             const [showPrompts, setShowPrompts] = useState(false); 
+            const [attachedImage, setAttachedImage] = useState(null);
+            const fileInputRef = useRef(null);
             const chatEndRef = useRef(null);
 
             // STATE UNTUK DRAG BUBBLE FIN
@@ -213,6 +217,7 @@
             const [confirmModal, setConfirmModal] = useState({ show: false, title: '', message: '', onConfirm: null });
             const [showSettings, setShowSettings] = useState(false);
             const [isSaving, setIsSaving] = useState(false);
+            const [isExited, setIsExited] = useState(false); // State untuk layar penutup
 
             const formatNumber = (num) => new Intl.NumberFormat('id-ID').format(num);
 
@@ -271,10 +276,15 @@
                 setConfirmModal({
                     show: true,
                     title: 'Keluar Aplikasi?',
-                    message: 'Ingin menutup aplikasi? Tenang Bos, semua data Anda sudah otomatis tersimpan dengan aman.',
+                    message: 'Ingin menutup sesi ini? Tenang Bos, semua data Anda sudah otomatis tersimpan di dalam brankas.',
                     onConfirm: () => {
-                        window.close();
-                        if (window.close) { window.location.href = 'about:blank'; }
+                        setConfirmModal({ show: false, title: '', message: '', onConfirm: null });
+                        setIsExited(true); // Memunculkan layar penutup yang lebih elegan
+                        
+                        // Coba paksa tutup untuk browser yang mengizinkan (seperti Chrome di Android)
+                        setTimeout(() => {
+                            window.close();
+                        }, 500);
                     }
                 });
             };
@@ -297,6 +307,7 @@
             useEffect(() => { localStorage.setItem('fin-agendas', JSON.stringify(agendas)); }, [agendas]);
             useEffect(() => { localStorage.setItem('fin-master', JSON.stringify(itemsDB)); }, [itemsDB]);
             useEffect(() => { localStorage.setItem('fin-settings', JSON.stringify(settings)); }, [settings]);
+            useEffect(() => { localStorage.setItem('fin-holidays', JSON.stringify(holidays)); }, [holidays]);
 
             useEffect(() => { if (isChatOpen) chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chats, isTyping, isChatOpen]);
 
@@ -408,7 +419,21 @@
                 showStatus('Daftar Belanja Berhasil Ditambahkan Otomatis!');
             };
 
-            const fetchFinAI = async (userText) => {
+            const handleFileChange = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    setAttachedImage({
+                        url: event.target.result,
+                        data: event.target.result.split(',')[1],
+                        mimeType: file.type
+                    });
+                };
+                reader.readAsDataURL(file);
+            };
+
+            const fetchFinAI = async (userText, imageData, chatHistory) => {
                 // =======================================================================
                 // PENTING: ISI API KEY ANDA DI BAWAH INI SEBELUM MENGGUNAKAN DI GITHUB
                 // =======================================================================
@@ -448,23 +473,58 @@ TUGAS UTAMA:
 1. INPUT DATA: Terjemahkan input transaksi menjadi JSON yang rapi.
 2. JAWAB LAPORAN: Jika pengguna meminta "Analisa Kas", "Tagihan", "Rekap Harian", atau "Laporan Bulanan", JAWABLAH DENGAN DATA DI ATAS. Buat kesimpulan apakah untung/rugi, overbudget atau aman.
 
+ATURAN ANALISA KEUANGAN (PROPORSI IDEAL & OVERBUDGET):
+- Beritahu Bos bahwa HPP (Modal Belanja Bahan Baku) yang sehat untuk warung/resto maksimal adalah 50% dari Omzet. 
+- Sisa 50% lainnya dialokasikan untuk operasional (listrik, gaji) dan profit bersih.
+- Jika rasio belanja bulan ini atau hari ini melebihi 50% dari pemasukan, beri teguran ramah bahwa warung sedang "OVERBUDGET" dan berikan saran untuk ngerem belanja besok.
+- Jika rasionya di bawah 50%, puji Bos bahwa "PROFIT AMAN & SEHAT".
+
+ATURAN KHUSUS UNTUK GAMBAR (FOTO STRUK ATAU SCREENSHOT APLIKASI Q-NOTA):
+1. JANGAN langsung menghasilkan 'actions' saat menerima gambar.
+2. ANALISA GAMBAR DENGAN SANGAT TELITI:
+   - Jika itu "Histori Pemasukan" (Screenshot aplikasi): Baca semua baris (Sumber seperti OFFLINE QRIS/GRABFOOD, Tanggal seperti 7 Mar, dan Nominal seperti + Rp 68.000).
+   - Jika itu "Riwayat Pengeluaran" / Arsip (Screenshot aplikasi): Baca Tanggal (misal 10 MAR 2026) dan Total (misal Rp 299.000). Gunakan nama barang "Belanja Resto" qty 1.
+   - Jika struk belanja biasa: Baca daftar barang, qty, dan harga.
+3. Tuliskan RINCIAN LENGKAP di 'reply' (tanggal konversi ke format YYYY-MM-DD, nominal, sumber/barang) lalu TANYAKAN KONFIRMASI (contoh: "Bos, Fin nemu data ini:\\n1. Grabfood (2026-03-07) Rp 102.829\\n...\\nMau disimpan ke kas?"). Kosongkan array 'actions' []. Untuk tanggal seperti "7 Mar", asumsikan tahun saat ini (${todayStr.substring(0,4)}).
+4. INGAT KONTEKS! Jika Bos menjawab "Ya", "Oke", "Simpan" pada konfirmasi Anda, BACA KEMBALI rincian di pesan Anda sebelumnya, Hasilkan 'actions' untuk SEMUA baris data tersebut sekaligus, lalu konfirmasi di 'reply' bahwa data sukses disimpan.
+
 ANDA WAJIB MEMBALAS HANYA DENGAN JSON MURNI DENGAN STRUKTUR BERIKUT:
 {
-  "reply": "Pesan balasan atau laporan Anda. (PENTING: Gunakan \\n untuk baris baru, jangan gunakan Enter asli di dalam string agar JSON tidak error)",
+  "reply": "Pesan balasan Anda. (PENTING: Gunakan \\n untuk baris baru, jangan gunakan Enter asli di dalam string agar JSON tidak error)",
   "actions": [
-     // Isi array ini HANYA JIKA pengguna meminta menginput transaksi baru.
+     // Isi array ini HANYA JIKA pengguna input manual ATAU sudah mengonfirmasi "Ya/Simpan" dari daftar data gambar di chat sebelumnya.
   ]
 }
 
-FORMAT OBJECT "actions" (Bisa diisi lebih dari 1 object):
-1. Pemasukan: {"type": "add_income", "data": {"date": "YYYY-MM-DD", "source": "Grabfood", "amount": 29000}}
-2. Belanja Bahan Baku: {"type": "add_expense", "data": {"date": "YYYY-MM-DD", "items": [{"name": "Beras", "qty": 5, "unit": "Kg", "total": 50000}]}}
+FORMAT OBJECT "actions" (Bisa diisi BANYAK object untuk input massal sekaligus):
+1. Pemasukan: {"type": "add_income", "data": {"date": "YYYY-MM-DD", "source": "Grabfood", "amount": 102829}}
+2. Belanja Bahan Baku: {"type": "add_expense", "data": {"date": "YYYY-MM-DD", "items": [{"name": "Belanja Resto", "qty": 1, "unit": "Pack", "total": 299000}]}}
 3. Agenda/Tagihan: {"type": "add_agenda", "data": {"date": "YYYY-MM-DD", "title": "Listrik", "amount": 100000, "agendaType": "keluar"}}
 
 ATURAN WAJIB: Jangan gunakan markdown code block (\`\`\`json) di respons Anda, langsung output object JSON.`;
 
+                let contents = chatHistory.slice(-5).map(chat => ({
+                    role: chat.sender === 'fin' ? 'model' : 'user',
+                    parts: [{ text: chat.text || "Gambar terlampir sebelumnya" }]
+                }));
+
+                const currentParts = [];
+                if (userText) currentParts.push({ text: userText });
+                else if (imageData) currentParts.push({ text: "Tolong analisa gambar nota/catatan ini." });
+
+                if (imageData) {
+                    currentParts.push({
+                        inlineData: {
+                            mimeType: imageData.mimeType,
+                            data: imageData.data
+                        }
+                    });
+                }
+
+                contents.push({ role: "user", parts: currentParts });
+
                 const payload = {
-                    contents: [{ role: "user", parts: [{ text: userText }] }],
+                    contents: contents,
                     systemInstruction: { parts: [{ text: sysPrompt }] },
                     generationConfig: {
                         responseMimeType: "application/json",
@@ -540,13 +600,19 @@ ATURAN WAJIB: Jangan gunakan markdown code block (\`\`\`json) di respons Anda, l
             const handleChatSubmit = async (e, forcedText = null) => {
                 if (e) e.preventDefault();
                 const text = forcedText || chatInput;
-                if (!text.trim()) return;
+                const imageToProcess = attachedImage;
+                
+                if (!text.trim() && !imageToProcess) return;
 
-                setChats(prev => [...prev, { id: Date.now(), sender: 'user', text, type: 'text' }]);
+                const newUserChat = { id: Date.now(), sender: 'user', text, image: imageToProcess?.url, type: 'text' };
+                setChats(prev => [...prev, newUserChat]);
+                
                 setChatInput('');
+                setAttachedImage(null);
                 setIsTyping(true);
                 
-                const responseObj = await fetchFinAI(text);
+                const historyToPass = [...chats];
+                const responseObj = await fetchFinAI(text, imageToProcess, historyToPass);
                 
                 setIsTyping(false);
                 
@@ -648,12 +714,23 @@ ATURAN WAJIB: Jangan gunakan markdown code block (\`\`\`json) di respons Anda, l
 
                     if (!isUpdating) {
                         const totalBelanjaHariIni = history.filter(h => h.date === transactionDate).reduce((sum, h) => sum + h.total, 0) + cartTotal;
+                        
+                        // Cek acuan omzet hari ini, kalau 0 pakai omzet kemarin untuk dianalisa rasionya
+                        let todayInc = incomes.filter(i => i.date === transactionDate).reduce((s,i) => s + i.amount, 0);
+                        let prevDayObj = new Date(transactionDate); prevDayObj.setDate(prevDayObj.getDate() - 1);
+                        let prevInc = incomes.filter(i => i.date === getLocalDateStr(prevDayObj)).reduce((s,i) => s + i.amount, 0);
+                        let refOmzet = todayInc > 0 ? todayInc : prevInc;
+                        let idealDynamicBudget = refOmzet > 0 ? refOmzet * 0.5 : settings.maxBelanja; // 50% dari omzet
 
                         let finMsg = `Bos, belanja senilai **Rp ${formatNumber(cartTotal)}** sudah Fin catat. Kas otomatis terpotong.\n\n`;
-                        if (totalBelanjaHariIni > settings.maxBelanja) {
-                            finMsg += `⚠️ **OVERBUDGET!** Total belanja hari ini Rp ${formatNumber(totalBelanjaHariIni)}, lebih besar Rp ${formatNumber(totalBelanjaHariIni - settings.maxBelanja)} dari batas. Harus lebih irit besok ya!`;
+                        
+                        if (totalBelanjaHariIni > idealDynamicBudget && refOmzet > 0) {
+                            let proporsi = Math.round((totalBelanjaHariIni / refOmzet) * 100);
+                            finMsg += `🚨 **WARNING OVERBUDGET!**\nTotal belanja hari ini (Rp ${formatNumber(totalBelanjaHariIni)}) telah menyedot **${proporsi}%** dari omzet acuan kita (Rp ${formatNumber(refOmzet)}).\nPadahal idealnya maksimal 50% lho Bos. Hati-hati profit menipis, besok wajib ngerem belanja ya! 📉`;
+                        } else if (totalBelanjaHariIni > settings.maxBelanja) {
+                            finMsg += `⚠️ **OVERBUDGET STANDAR!**\nTotal belanja hari ini (Rp ${formatNumber(totalBelanjaHariIni)}) melampaui setelan batas maksimal Bos. Cek ulang keranjang besok.`;
                         } else {
-                            finMsg += `Aman! Total belanja hari ini Rp ${formatNumber(totalBelanjaHariIni)} masih di bawah batas.`;
+                            finMsg += `✅ **PROPORSI AMAN!**\nTotal belanja hari ini (Rp ${formatNumber(totalBelanjaHariIni)}) masih dalam batas yang sangat sehat (di bawah alokasi ideal 50%). Target profit terjaga dengan baik! 📈`;
                         }
                         triggerFinSystemMessage(finMsg);
                     }
@@ -696,9 +773,20 @@ ATURAN WAJIB: Jangan gunakan markdown code block (\`\`\`json) di respons Anda, l
                 setIncomes(prev => [newIncome, ...prev].sort((a,b) => b.timestamp - a.timestamp));
                 setIncomeSource(''); setIncomeAmount(''); showStatus('Pemasukan Ditambahkan!');
 
-                let finMsg = `Mantap Bos! Pemasukan dari **${stdSource}** Rp ${formatNumber(amount)} sudah masuk ke kas.\n\n`;
-                if (amount >= settings.targetOmzet) finMsg += `🎉 **TARGET TERCAPAI!** Omzet berhasil tembus target harian.`;
-                else finMsg += `Pemasukan ini masih kurang Rp ${formatNumber(settings.targetOmzet - amount)} dari target. Genjot lagi besok!`;
+                let idealBelanjaBesok = amount * 0.5; // Alokasi 50% untuk HPP Belanja
+                let sisaOperasionalProfit = amount - idealBelanjaBesok; // 50% untuk untung dan operasional
+
+                let finMsg = `Mantap Bos! Pemasukan dari **${stdSource}** senilai **Rp ${formatNumber(amount)}** berhasil masuk brankas. 💰\n\n`;
+                finMsg += `💡 **Rencana Alokasi (Rule 50%):**\n`;
+                finMsg += `Dari omzet ini, Bos punya *budget* maksimal **Rp ${formatNumber(idealBelanjaBesok)}** untuk kulakan/belanja bahan baku besok.\n`;
+                finMsg += `Sisa **Rp ${formatNumber(sisaOperasionalProfit)}** aman untuk dialokasikan sebagai biaya operasional, gaji, dan tabungan Profit murni Bos!.\n\n`;
+
+                if (amount >= settings.targetOmzet) {
+                    finMsg += `🎉 Target omzet harian tercapai! Warung luar biasa hari ini.`;
+                } else {
+                    finMsg += `Target harian belum tercapai (kurang Rp ${formatNumber(settings.targetOmzet - amount)}). Gas terus!`;
+                }
+
                 triggerFinSystemMessage(finMsg);
             };
 
@@ -742,6 +830,14 @@ ATURAN WAJIB: Jangan gunakan markdown code block (\`\`\`json) di respons Anda, l
                 let text = `Fina, tolong catat ${agenda.type === 'keluar' ? 'pengeluaran Biaya Operasional' : 'pemasukan Biaya Operasional'} pada tanggal ${dateFormatted}.\n\n`;
                 text += `Detail: ${agenda.title} sebesar Rp ${agenda.amount}\n`;
                 copyToClipboard(text);
+            };
+
+            const toggleHoliday = (dateStr) => {
+                setHolidays(prev => {
+                    const newHols = prev.includes(dateStr) ? prev.filter(d => d !== dateStr) : [...prev, dateStr];
+                    return newHols;
+                });
+                showStatus(holidays.includes(dateStr) ? 'Hari Kerja Diaktifkan' : 'Warung Libur Diset!');
             };
 
             const renderAgendaSummary = () => {
@@ -871,8 +967,9 @@ ATURAN WAJIB: Jangan gunakan markdown code block (\`\`\`json) di respons Anda, l
                     let agendaIn = dayAgendas.filter(a=>a.type==='masuk').reduce((s,a) => s + a.amount, 0);
                     let agendaOut = dayAgendas.filter(a=>a.type==='keluar').reduce((s,a) => s + a.amount, 0);
 
-                    let dailyIn = isFuture && !actualInc && !agendaIn ? settings.targetOmzet : (actualInc + agendaIn);
-                    let dailyOut = isFuture && !actualExp && !agendaOut ? settings.maxBelanja : (actualExp + agendaOut);
+                    let isHoliday = holidays.includes(dStr);
+                    let dailyIn = isFuture && !actualInc && !agendaIn && !isHoliday ? settings.targetOmzet : (actualInc + agendaIn);
+                    let dailyOut = isFuture && !actualExp && !agendaOut && !isHoliday ? settings.maxBelanja : (actualExp + agendaOut);
 
                     let saldoPagi = runningBalance;
                     runningBalance = saldoPagi + dailyIn - dailyOut;
@@ -880,7 +977,7 @@ ATURAN WAJIB: Jangan gunakan markdown code block (\`\`\`json) di respons Anda, l
                     reportDays.push({
                         date: dStr,
                         displayDate: d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }),
-                        isToday, isFuture, saldoPagi, dailyIn, dailyOut, saldoAkhir: runningBalance,
+                        isToday, isFuture, isHoliday, saldoPagi, dailyIn, dailyOut, saldoAkhir: runningBalance,
                         hasData: actualInc > 0 || actualExp > 0 || agendaIn > 0 || agendaOut > 0,
                         details: { incomes: dayIncomes, expenses: dayExpenses, agendas: dayAgendas }
                     });
@@ -991,73 +1088,100 @@ ATURAN WAJIB: Jangan gunakan markdown code block (\`\`\`json) di respons Anda, l
                                 <input type="month" value={dashboardMonth} onChange={e => setDashboardMonth(e.target.value)} className="bg-transparent text-indigo-600 font-bold text-xs outline-none" />
                             </div>
                             <div className="max-h-[50vh] overflow-y-auto no-scrollbar bg-slate-50 p-3 space-y-2">
-                                {data.reportDays.map((day, i) => (
-                                    <div key={i} className={`p-4 rounded-[2rem] border transition-all ${day.isToday ? 'bg-indigo-50 border-indigo-200 shadow-md scale-[1.02]' : (day.isFuture ? 'bg-white border-dashed border-slate-200 opacity-70' : 'bg-white border-slate-100 shadow-sm')}`}>
-                                        
-                                        <div className="flex justify-between items-center mb-3">
-                                            <span className={`font-black text-[11px] uppercase tracking-widest ${day.isToday ? 'text-indigo-600' : 'text-slate-600'}`}>
-                                                {day.displayDate} {day.isToday && <span className="bg-indigo-600 text-white px-2 py-0.5 rounded-full ml-1 text-[8px]">HARI INI</span>}
-                                                {day.isFuture && <span className="text-slate-400 ml-1 text-[8px]">(Prediksi)</span>}
-                                            </span>
-                                            <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest cursor-pointer hover:text-indigo-600" onClick={() => setExpandedDay(expandedDay === day.date ? null : day.date)}>
-                                                {expandedDay === day.date ? 'Tutup Detail ▲' : 'Buka Detail ▼'}
-                                            </span>
-                                        </div>
+                                {data.reportDays.map((day, i) => {
+                                    // Hitung Lencana Status (Profit/Over/Rugi) untuk hari yang sudah lewat atau hari ini
+                                    let badge = null;
+                                    const totalActualIn = day.details.incomes.reduce((s, i) => s + i.amount, 0) + day.details.agendas.filter(a=>a.type==='masuk').reduce((s,a) => s + a.amount, 0);
+                                    const totalActualOut = day.details.expenses.reduce((s, h) => s + h.total, 0) + day.details.agendas.filter(a=>a.type==='keluar').reduce((s,a) => s + a.amount, 0);
+                                    
+                                    if (day.hasData && !day.isFuture && !day.isHoliday) {
+                                        const dynamicBudgetLimit = totalActualIn > 0 ? totalActualIn * 0.5 : settings.maxBelanja;
+                                        if (totalActualOut > totalActualIn && totalActualIn > 0) {
+                                            badge = { text: 'RUGI', color: 'bg-red-500 text-white shadow-red-500/30' };
+                                        } else if (totalActualOut > dynamicBudgetLimit) {
+                                            badge = { text: 'OVER', color: 'bg-amber-500 text-white shadow-amber-500/30' };
+                                        } else if (totalActualIn > totalActualOut) {
+                                            badge = { text: 'PROFIT', color: 'bg-green-500 text-white shadow-green-500/30' };
+                                        }
+                                    }
 
-                                        <div className="space-y-1.5 text-[11px]">
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-slate-500 font-bold">Saldo Pagi</span>
-                                                <span className="font-black text-slate-700">Rp {formatNumber(day.saldoPagi)}</span>
+                                    return (
+                                        <div key={i} className={`p-4 rounded-[2rem] border transition-all ${day.isToday ? 'bg-indigo-50 border-indigo-200 shadow-md scale-[1.02]' : (day.isHoliday ? 'bg-amber-50/50 border-amber-100 shadow-sm' : (day.isFuture ? 'bg-white border-dashed border-slate-200 opacity-70' : 'bg-white border-slate-100 shadow-sm'))}`}>
+                                            
+                                            <div className="flex justify-between items-center mb-3">
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                    <span className={`font-black text-[11px] uppercase tracking-widest ${day.isToday ? 'text-indigo-600' : 'text-slate-600'}`}>
+                                                        {day.displayDate}
+                                                    </span>
+                                                    {day.isToday && <span className="bg-indigo-600 text-white px-2 py-0.5 rounded-full text-[8px] font-black uppercase">HARI INI</span>}
+                                                    {day.isHoliday && <span className="bg-amber-500 text-white px-2 py-0.5 rounded-full text-[8px] font-black uppercase shadow-sm">TUTUP</span>}
+                                                    {day.isFuture && !day.isHoliday && <span className="text-slate-400 text-[8px] font-bold">(Prediksi)</span>}
+                                                    {badge && <span className={`${badge.color} px-2 py-0.5 rounded-full text-[8px] font-black uppercase shadow-sm ml-1 animate-fadeIn`}>{badge.text}</span>}
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <button onClick={() => toggleHoliday(day.date)} className={`text-[8px] font-bold px-2 py-1 rounded-lg border transition-colors ${day.isHoliday ? 'bg-amber-100 text-amber-700 border-amber-200' : 'text-slate-400 border-slate-200 hover:bg-slate-100 hover:text-slate-600'}`}>
+                                                        {day.isHoliday ? 'Batal Libur' : 'Set Libur'}
+                                                    </button>
+                                                    <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest cursor-pointer hover:text-indigo-600" onClick={() => setExpandedDay(expandedDay === day.date ? null : day.date)}>
+                                                        {expandedDay === day.date ? 'Tutup ▲' : 'Detail ▼'}
+                                                    </span>
+                                                </div>
                                             </div>
-                                            <div className="flex justify-between items-center bg-green-50/50 p-1.5 rounded-lg cursor-pointer hover:bg-green-50" onClick={() => setExpandedDay(day.date)}>
-                                                <span className="text-green-600 font-bold flex items-center gap-1">➕ Pemasukan <span className="text-[8px] opacity-50">Klik</span></span>
-                                                <span className="font-black text-green-600">+{formatNumber(day.dailyIn)}</span>
-                                            </div>
-                                            <div className="flex justify-between items-center bg-red-50/50 p-1.5 rounded-lg cursor-pointer hover:bg-red-50" onClick={() => setExpandedDay(day.date)}>
-                                                <span className="text-red-600 font-bold flex items-center gap-1">➖ Pengeluaran <span className="text-[8px] opacity-50">Klik</span></span>
-                                                <span className="font-black text-red-600">-{formatNumber(day.dailyOut)}</span>
-                                            </div>
-                                        </div>
 
-                                        {expandedDay === day.date && (
-                                            <div className="mt-3 pt-3 border-t border-slate-200 space-y-1.5 animate-fadeIn">
-                                                <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1">Rincian Transaksi</p>
-                                                {day.details.incomes.map(inc => (
-                                                    <div key={inc.id} className="flex justify-between text-[10px]">
-                                                        <span className="font-bold text-slate-600 uppercase">🔹 {inc.source}</span>
-                                                        <span className="font-black text-green-600">+{formatNumber(inc.amount)}</span>
-                                                    </div>
-                                                ))}
-                                                {day.details.agendas.filter(a=>a.type==='masuk').map(ag => (
-                                                    <div key={ag.id} className="flex justify-between text-[10px]">
-                                                        <span className="font-bold text-slate-600 uppercase">🔹 Opr: {ag.title}</span>
-                                                        <span className="font-black text-green-600">+{formatNumber(ag.amount)}</span>
-                                                    </div>
-                                                ))}
-                                                {day.details.expenses.map(exp => (
-                                                    <div key={exp.id} className="flex justify-between text-[10px]">
-                                                        <span className="font-bold text-slate-600 uppercase">🔸 Belanja Bahan Baku</span>
-                                                        <span className="font-black text-red-500">-{formatNumber(exp.total)}</span>
-                                                    </div>
-                                                ))}
-                                                {day.details.agendas.filter(a=>a.type==='keluar').map(ag => (
-                                                    <div key={ag.id} className="flex justify-between text-[10px]">
-                                                        <span className="font-bold text-slate-600 uppercase">🔸 Opr: {ag.title}</span>
-                                                        <span className="font-black text-red-500">-{formatNumber(ag.amount)}</span>
-                                                    </div>
-                                                ))}
-                                                {(!day.details.incomes.length && !day.details.expenses.length && !day.details.agendas.length) && (
-                                                    <div className="text-center text-[9px] text-slate-400 italic font-bold">Tidak ada rincian data aktual</div>
-                                                )}
+                                            <div className="space-y-1.5 text-[11px]">
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-slate-500 font-bold">Saldo Pagi</span>
+                                                    <span className="font-black text-slate-700">Rp {formatNumber(day.saldoPagi)}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center bg-green-50/50 p-1.5 rounded-lg cursor-pointer hover:bg-green-50" onClick={() => setExpandedDay(day.date)}>
+                                                    <span className="text-green-600 font-bold flex items-center gap-1">➕ Pemasukan <span className="text-[8px] opacity-50">Klik</span></span>
+                                                    <span className="font-black text-green-600">+{formatNumber(day.dailyIn)}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center bg-red-50/50 p-1.5 rounded-lg cursor-pointer hover:bg-red-50" onClick={() => setExpandedDay(day.date)}>
+                                                    <span className="text-red-600 font-bold flex items-center gap-1">➖ Pengeluaran <span className="text-[8px] opacity-50">Klik</span></span>
+                                                    <span className="font-black text-red-600">-{formatNumber(day.dailyOut)}</span>
+                                                </div>
                                             </div>
-                                        )}
+
+                                            {expandedDay === day.date && (
+                                                <div className="mt-3 pt-3 border-t border-slate-200 space-y-1.5 animate-fadeIn">
+                                                    <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1">Rincian Transaksi</p>
+                                                    {day.details.incomes.map(inc => (
+                                                        <div key={inc.id} className="flex justify-between text-[10px]">
+                                                            <span className="font-bold text-slate-600 uppercase">🔹 {inc.source}</span>
+                                                            <span className="font-black text-green-600">+{formatNumber(inc.amount)}</span>
+                                                        </div>
+                                                    ))}
+                                                    {day.details.agendas.filter(a=>a.type==='masuk').map(ag => (
+                                                        <div key={ag.id} className="flex justify-between text-[10px]">
+                                                            <span className="font-bold text-slate-600 uppercase">🔹 Opr: {ag.title}</span>
+                                                            <span className="font-black text-green-600">+{formatNumber(ag.amount)}</span>
+                                                        </div>
+                                                    ))}
+                                                    {day.details.expenses.map(exp => (
+                                                        <div key={exp.id} className="flex justify-between text-[10px]">
+                                                            <span className="font-bold text-slate-600 uppercase">🔸 Belanja Bahan Baku</span>
+                                                            <span className="font-black text-red-500">-{formatNumber(exp.total)}</span>
+                                                        </div>
+                                                    ))}
+                                                    {day.details.agendas.filter(a=>a.type==='keluar').map(ag => (
+                                                        <div key={ag.id} className="flex justify-between text-[10px]">
+                                                            <span className="font-bold text-slate-600 uppercase">🔸 Opr: {ag.title}</span>
+                                                            <span className="font-black text-red-500">-{formatNumber(ag.amount)}</span>
+                                                        </div>
+                                                    ))}
+                                                    {(!day.details.incomes.length && !day.details.expenses.length && !day.details.agendas.length) && (
+                                                        <div className="text-center text-[9px] text-slate-400 italic font-bold">Tidak ada rincian data aktual</div>
+                                                    )}
+                                                </div>
+                                            )}
 
                                         <div className="flex justify-between items-center border-t border-slate-200/60 mt-2.5 pt-2.5">
                                             <span className="text-indigo-600 font-black uppercase tracking-widest text-[10px]">Saldo Akhir Hari</span>
                                             <span className="font-black text-indigo-700 text-xs bg-indigo-100/50 px-2 py-1 rounded-lg">Rp {formatNumber(day.saldoAkhir)}</span>
                                         </div>
                                     </div>
-                                ))}
+                                )})}
                             </div>
                         </div>
 
@@ -1125,6 +1249,18 @@ ATURAN WAJIB: Jangan gunakan markdown code block (\`\`\`json) di respons Anda, l
                 setHasNewFinAlert(false);
             };
 
+            // Tampilan Layar Penutup (Goodbye Screen) pengganti about:blank
+            if (isExited) {
+                return (
+                    <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-center text-white font-sans selection:bg-indigo-500" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+                        <div className="w-20 h-20 bg-indigo-600 rounded-[1.2rem] flex items-center justify-center font-black text-4xl shadow-2xl rotate-3 mb-8">Q</div>
+                        <h1 className="text-3xl font-black tracking-tighter mb-4">Sesi Selesai 👋</h1>
+                        <p className="text-slate-400 font-medium mb-12 max-w-xs leading-relaxed">Data hari ini sudah diamankan.<br/><br/>Silakan tekan tombol Beranda atau usap layar ke atas (swipe) untuk menutup aplikasi.</p>
+                        <button onClick={() => setIsExited(false)} className="px-6 py-3 bg-white/10 border border-white/20 text-white rounded-full font-bold text-sm hover:bg-white/20 transition-colors">Buka Kembali Aplikasi</button>
+                    </div>
+                );
+            }
+
             const renderFloatingFin = () => (
                 <div className={`fixed inset-0 z-[600] pointer-events-none flex flex-col justify-end transition-all duration-300 ${isChatOpen ? 'bg-black/40 pointer-events-auto backdrop-blur-sm' : ''}`}>
                     <div className={`w-full max-w-md mx-auto bg-slate-50 rounded-t-[2.5rem] shadow-2xl pointer-events-auto flex flex-col transition-transform duration-500 ease-in-out border-t border-slate-200 ${isChatOpen ? 'translate-y-0 h-[85vh]' : 'translate-y-full h-[85vh] opacity-0'}`}>
@@ -1142,6 +1278,7 @@ ATURAN WAJIB: Jangan gunakan markdown code block (\`\`\`json) di respons Anda, l
                             {chats.map(chat => (
                                 <div key={chat.id} className={`flex w-full chat-enter ${chat.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
                                     <div className={`max-w-[85%] p-4 rounded-[1.5rem] shadow-sm text-[13px] leading-relaxed ${chat.sender === 'user' ? 'bg-indigo-600 text-white rounded-tr-sm' : 'glass-bubble text-slate-700 rounded-tl-sm border border-slate-200 bg-white'}`}>
+                                        {chat.image && <img src={chat.image} alt="Upload" className="w-full max-w-[200px] rounded-xl mb-2 border border-white/20 shadow-sm" />}
                                         {chat.sender === 'fin' ? (
                                             <div className="markdown-body" dangerouslySetInnerHTML={{__html: window.marked ? window.marked.parse(chat.text) : chat.text}} />
                                         ) : (
@@ -1176,11 +1313,22 @@ ATURAN WAJIB: Jangan gunakan markdown code block (\`\`\`json) di respons Anda, l
                                 </div>
                             </div>
 
+                            {attachedImage && (
+                                <div className="mb-3 relative inline-block">
+                                    <img src={attachedImage.url} alt="Preview" className="h-20 w-auto rounded-xl border border-slate-200 shadow-sm" />
+                                    <button type="button" onClick={() => setAttachedImage(null)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-md border-2 border-white"><Icons.X /></button>
+                                </div>
+                            )}
+
                             <form onSubmit={(e) => handleChatSubmit(e)} className="flex gap-2 relative items-center">
+                                <input type="file" accept="image/*" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
+                                <button type="button" onClick={() => fileInputRef.current.click()} className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-sm border bg-white text-indigo-500 border-slate-200 hover:bg-slate-50 transition-colors">
+                                    <div className="w-6 h-6"><Icons.Camera /></div>
+                                </button>
                                 <button type="button" onClick={startListening} className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-sm border transition-colors ${isListening ? 'bg-red-500 text-white border-red-500 animate-pulse' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}>
                                     <div className="w-6 h-6"><Icons.Mic /></div>
                                 </button>
-                                <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="Ketik atau pakai suara..." className="flex-1 bg-slate-100 p-4 rounded-2xl font-bold text-sm text-slate-700 outline-none focus:ring-2 focus:ring-indigo-300" />
+                                <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="Ketik, suara, atau foto..." className="flex-1 bg-slate-100 p-4 rounded-2xl font-bold text-sm text-slate-700 outline-none focus:ring-2 focus:ring-indigo-300" />
                                 <button type="submit" disabled={isTyping} className="w-14 h-14 text-white rounded-2xl flex items-center justify-center bg-indigo-600 shadow-lg shrink-0"><div className="w-6 h-6"><Icons.Send /></div></button>
                             </form>
                         </div>
